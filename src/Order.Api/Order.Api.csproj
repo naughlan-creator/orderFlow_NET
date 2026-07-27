@@ -26,4 +26,10 @@
     <ProjectReference Include="..\OrderFlow.Contracts\OrderFlow.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Protobuf Include="../Inventory.Service/Protos/inventory.proto"
+              GrpcServices="Client"
+              Link="Protos/inventory.proto" />
+  </ItemGroup>
+
 </Project>
