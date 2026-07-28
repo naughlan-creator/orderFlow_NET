@@ -1,0 +1,151 @@
+name: orderflow
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: orderflow
+      POSTGRES_USER: orderflow
+      POSTGRES_PASSWORD: orderflow_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderflow -d orderflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  kafka:
+    image: confluentinc/cp-kafka:8.1.0
+    hostname: kafka
+    container_name: orderflow-kafka
+    ports:
+      - "19092:19092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >
+        CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+      KAFKA_LISTENERS: >
+        PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:19092
+      KAFKA_ADVERTISED_LISTENERS: >
+        PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:19092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:19092 --list"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+  kafka-init:
+    image: confluentinc/cp-kafka:8.1.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint:
+      - /bin/bash
+      - -c
+    command:
+      - |
+        set -e
+
+        echo "Creating order.created..."
+        kafka-topics --bootstrap-server kafka:29092 \
+          --create \
+          --if-not-exists \
+          --topic order.created \
+          --partitions 3 \
+          --replication-factor 1
+
+        echo "Creating inventory.reserved..."
+        kafka-topics --bootstrap-server kafka:29092 \
+          --create \
+          --if-not-exists \
+          --topic inventory.reserved \
+          --partitions 3 \
+          --replication-factor 1
+
+        echo "Creating inventory.rejected..."
+        kafka-topics --bootstrap-server kafka:29092 \
+          --create \
+          --if-not-exists \
+          --topic inventory.rejected \
+          --partitions 3 \
+          --replication-factor 1
+
+        echo "Available topics:"
+        kafka-topics --bootstrap-server kafka:29092 --list
+    restart: "no"
+    
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: orderflow-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: src/Inventory.Service/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      Kestrel__EndpointDefaults__Protocols: Http2
+      ConnectionStrings__InventoryDatabase: >
+        Host=postgres;Port=5432;Database=orderflow;Username=orderflow;Password=orderflow_dev
+      Kafka__BootstrapServers: kafka:29092
+      Kafka__GroupId: inventory-service
+    ports:
+      - "5002:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: on-failure
+  order-api:
+    build:
+      context: .
+      dockerfile: src/Order.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__OrdersDatabase: >
+        Host=postgres;Port=5432;Database=orderflow;Username=orderflow;Password=orderflow_dev
+      Kafka__BootstrapServers: kafka:29092
+      InventoryGrpc__Address: http://inventory-service:8080
+    ports:
+      - "5001:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      inventory-service:
+        condition: service_started
+    restart: on-failure
+  notification-worker:
+    build:
+      context: .
+      dockerfile: src/Notification.Worker/Dockerfile
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      Kafka__BootstrapServers: kafka:29092
+      Kafka__GroupId: notification-worker
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    restart: on-failure
+volumes:
+  postgres-data:
