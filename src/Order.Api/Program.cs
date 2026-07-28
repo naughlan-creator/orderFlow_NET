@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Order.Api.Data;
 using Order.Api.Messaging;
+using OrderFlow.Contracts;
 using OrderFlow.Inventory.Grpc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +19,8 @@ var kafkaOptions = builder.Configuration.GetSection(KafkaOptions.SectionName)
 
 builder.Services.AddSingleton(kafkaOptions);
 builder.Services.AddSingleton<IKafkaProducer, KafkaProducer>();
+builder.Services.AddHostedService<OutboxPublisher>();
+builder.Services.AddHostedService<OrderStatusConsumer>();
 
 var inventoryAddress = builder.Configuration["InventoryGrpc:Address"] ?? "http://localhost:5002";
 

@@ -23,4 +23,11 @@ public sealed class OrderModelTests
         order.Quantity.Should().Be(2);
         order.CustomerEmail.Should().Be("customer@example.com");
     }
+    [Fact]
+    public void Outbox_message_should_start_unprocessed()
+    {
+        var message = new OutboxMessage { Id = Guid.NewGuid() };
+        message.ProcessedAtUtc.Should().BeNull();
+        message.Attempts.Should().Be(0);
+    }
 }

@@ -1,16 +1,18 @@
-using System.Text.Json;
 using Confluent.Kafka;
+using OrderFlow.Contracts;
 namespace Order.Api.Messaging;
+
 public interface IKafkaProducer
 {
-    Task ProduceAsync<T>(string topic, string key, T message,
+    /// <summary>Publishes an already-serialised payload; the outbox owns serialisation.</summary>
+    Task ProduceAsync(string topic, string key, string payload,
         CancellationToken cancellationToken = default);
 }
+
 public sealed class KafkaProducer : IKafkaProducer, IDisposable
 {
     private readonly IProducer<string, string> _producer;
     private readonly ILogger<KafkaProducer> _logger;
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     public KafkaProducer(KafkaOptions options, ILogger<KafkaProducer> logger)
     {
         _logger = logger;
@@ -18,19 +20,19 @@ public sealed class KafkaProducer : IKafkaProducer, IDisposable
         {
             BootstrapServers = options.BootstrapServers,
             Acks = Acks.All,
-            EnableIdempotence = true,
-            MessageSendMaxRetries = 5
+            // MessageSendMaxRetries is deliberately left at its default (int.MaxValue);
+            // lowering it weakens the guarantee EnableIdempotence is here to provide.
+            EnableIdempotence = true
         }).Build();
     }
-    public async Task ProduceAsync<T>(string topic, string key, T message,
+    public async Task ProduceAsync(string topic, string key, string payload,
         CancellationToken cancellationToken = default)
     {
-        var payload = JsonSerializer.Serialize(message, JsonOptions);
         var result = await _producer.ProduceAsync(
             topic,
             new Message<string, string> { Key = key, Value = payload },
             cancellationToken);
-             _logger.LogInformation(
+        _logger.LogInformation(
             "Published event to {Topic} partition {Partition} offset {Offset}",
             result.Topic, result.Partition.Value, result.Offset.Value);
     }

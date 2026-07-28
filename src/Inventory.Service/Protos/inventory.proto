@@ -18,4 +18,7 @@ message CheckAvailabilityReply {
     bool available = 1;
     int32 available_quantity = 2;
     string message = 3;
+    // Distinguishes "unknown product" (a bad request) from
+    // "known product, not enough stock" (a genuine conflict).
+    bool product_found = 4;
 }

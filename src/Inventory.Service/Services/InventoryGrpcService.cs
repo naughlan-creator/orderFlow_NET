@@ -18,6 +18,7 @@ public sealed class InventoryGrpcService(
             {
                 Available = false,
                 AvailableQuantity = 0,
+                ProductFound = false,
                 Message = "Product ID is invalid."
             };
         }
@@ -31,6 +32,7 @@ public sealed class InventoryGrpcService(
             {
                 Available = false,
                 AvailableQuantity = 0,
+                ProductFound = false,
                 Message = "Product does not exist."
             };
         }
@@ -42,6 +44,7 @@ public sealed class InventoryGrpcService(
         {
             Available = available,
             AvailableQuantity = item.AvailableQuantity,
+            ProductFound = true,
             Message = available ? "Stock is available." : "Insufficient stock."
         };
     }

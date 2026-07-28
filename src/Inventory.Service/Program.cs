@@ -3,6 +3,7 @@ using Inventory.Service.Messaging;
 using Inventory.Service.Models;
 using Inventory.Service.Services;
 using Microsoft.EntityFrameworkCore;
+using OrderFlow.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGrpc();
