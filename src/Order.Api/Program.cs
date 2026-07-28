@@ -1,25 +1,46 @@
+using Microsoft.EntityFrameworkCore;
+using Order.Api.Data;
+using Order.Api.Messaging;
+using OrderFlow.Inventory.Grpc;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHealthChecks().AddDbContextCheck<OrdersDbContext>();
+
+builder.Services.AddDbContext<OrdersDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("OrdersDatabase")));
+
+var kafkaOptions = builder.Configuration.GetSection(KafkaOptions.SectionName)
+    .Get<KafkaOptions>() ?? new KafkaOptions();
+
+builder.Services.AddSingleton(kafkaOptions);
+builder.Services.AddSingleton<IKafkaProducer, KafkaProducer>();
+
+var inventoryAddress = builder.Configuration["InventoryGrpc:Address"] ?? "http://localhost:5002";
+
+builder.Services.AddGrpcClient<InventoryGrpc.InventoryGrpcClient>(options =>
+{
+    options.Address = new Uri(inventoryAddress);
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI();
+app.MapControllers();
+app.MapHealthChecks("/health");
+
+await ApplyMigrationsAsync(app);
+await app.RunAsync();
+
+static async Task ApplyMigrationsAsync(WebApplication app)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+    await db.Database.MigrateAsync();
 }
 
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+public partial class Program;

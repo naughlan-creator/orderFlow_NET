@@ -10,6 +10,7 @@
     <PackageReference Include="Confluent.Kafka" Version="2.15.0" />
     <PackageReference Include="Google.Protobuf" Version="3.35.1" />
     <PackageReference Include="Grpc.Net.Client" Version="2.80.0" />
+    <PackageReference Include="Grpc.Net.ClientFactory" Version="2.80.0" />
     <PackageReference Include="Grpc.Tools" Version="2.83.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -18,6 +19,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
@@ -27,9 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="../Inventory.Service/Protos/inventory.proto"
-              GrpcServices="Client"
-              Link="Protos/inventory.proto" />
+    <Protobuf Include="../Inventory.Service/Protos/inventory.proto" GrpcServices="Client" Link="Protos/inventory.proto" />
   </ItemGroup>
 
 </Project>
